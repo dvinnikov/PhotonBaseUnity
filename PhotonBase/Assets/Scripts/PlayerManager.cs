@@ -4,6 +4,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class PlayerManager : MonoBehaviourPunCallbacks, IPunObservable
 {
@@ -16,8 +17,16 @@ public class PlayerManager : MonoBehaviourPunCallbacks, IPunObservable
 
     bool isFiring;
 
+    [Tooltip("The local player instance. Use this to know if the local player is represented in the Scene")]
+    public static GameObject LocalPlayerInstance;
+
     private void Awake()
     {
+        if (photonView.IsMine)
+        {
+            LocalPlayerInstance = this.gameObject;
+        }
+
         if (beams == null)
         {
             Debug.LogError("<Color=Red><a>Missing</a></Color> Beams Reference.", this);
@@ -26,6 +35,10 @@ public class PlayerManager : MonoBehaviourPunCallbacks, IPunObservable
         {
             beams.SetActive(false);
         }
+
+        // #Critical
+        // we flag as don't destroy on load so that instance survives level synchronization, thus giving a seamless experience when levels load.
+        DontDestroyOnLoad(this.gameObject);
     }
 
     // Start is called before the first frame update
@@ -44,6 +57,8 @@ public class PlayerManager : MonoBehaviourPunCallbacks, IPunObservable
         {
             Debug.LogError("<Color=Red><a>Missing</a></Color> CameraWork Component on playerPrefab.", this);
         }
+
+        SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
     // Update is called once per frame
@@ -64,24 +79,6 @@ public class PlayerManager : MonoBehaviourPunCallbacks, IPunObservable
         if (beams != null && isFiring != beams.activeInHierarchy)
         {
             beams.SetActive(isFiring);
-        }
-    }
-
-    private void ProcessInputs()
-    {
-        if (Input.GetButtonDown("Fire1"))
-        {
-            if (!isFiring)
-            {
-                isFiring = true;
-            }
-        }
-        if (Input.GetButtonUp("Fire1"))
-        {
-            if (isFiring)
-            {
-                isFiring = false;
-            }
         }
     }
 
@@ -117,6 +114,37 @@ public class PlayerManager : MonoBehaviourPunCallbacks, IPunObservable
         Health -= 0.1f * Time.deltaTime;
     }
 
+#if UNITY_5_4_OR_NEWER
+    private void OnLevelWasLoaded(int level)
+    {
+        this.CalledOnLevelWasLoaded(level);
+    }
+#endif
+
+    public override void OnDisable()
+    {
+        base.OnDisable();
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    private void ProcessInputs()
+    {
+        if (Input.GetButtonDown("Fire1"))
+        {
+            if (!isFiring)
+            {
+                isFiring = true;
+            }
+        }
+        if (Input.GetButtonUp("Fire1"))
+        {
+            if (isFiring)
+            {
+                isFiring = false;
+            }
+        }
+    }
+
     public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
     {
         if (stream.IsWriting)
@@ -128,6 +156,23 @@ public class PlayerManager : MonoBehaviourPunCallbacks, IPunObservable
         {
             this.isFiring = (bool)stream.ReceiveNext();
             this.Health = (float)stream.ReceiveNext();
+        }
+    }
+
+#if UNITY_5_4_OR_NEWER
+    void OnSceneLoaded(Scene scene, LoadSceneMode loadingMode)
+    {
+        this.CalledOnLevelWasLoaded(scene.buildIndex);
+    }
+
+
+#endif
+
+    private void CalledOnLevelWasLoaded(int buildIndex)
+    {
+        if (!Physics.Raycast(transform.position, -Vector3.up, 5f))
+        {
+            transform.position = new Vector3(0f, 5f, 0f);
         }
     }
 }
