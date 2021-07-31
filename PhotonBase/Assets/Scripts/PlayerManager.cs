@@ -1,10 +1,11 @@
 using Photon.Pun;
+using Photon.Pun.Demo.PunBasics;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class PlayerManager : MonoBehaviourPunCallbacks
+public class PlayerManager : MonoBehaviourPunCallbacks, IPunObservable
 {
     [Tooltip("The Beams GameObject to control")]
     [SerializeField]
@@ -30,12 +31,29 @@ public class PlayerManager : MonoBehaviourPunCallbacks
     // Start is called before the first frame update
     void Start()
     {
-        
+        CameraWork _cameraWork = this.gameObject.GetComponent<CameraWork>();
+
+        if (_cameraWork != null)
+        {
+            if (photonView.IsMine)
+            {
+                _cameraWork.OnStartFollowing();
+            }
+        }
+        else
+        {
+            Debug.LogError("<Color=Red><a>Missing</a></Color> CameraWork Component on playerPrefab.", this);
+        }
     }
 
     // Update is called once per frame
     void Update()
     {
+        if (photonView.IsMine)
+        {
+            ProcessInputs();
+        }
+
         ProcessInputs();
 
         if (Health <= 0f)
@@ -97,5 +115,19 @@ public class PlayerManager : MonoBehaviourPunCallbacks
         }
         // we slowly affect health when beam is constantly hitting us, so player has to move to prevent death.
         Health -= 0.1f * Time.deltaTime;
+    }
+
+    public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
+    {
+        if (stream.IsWriting)
+        {
+            stream.SendNext(isFiring);
+            stream.SendNext(Health);
+        }
+        else
+        {
+            this.isFiring = (bool)stream.ReceiveNext();
+            this.Health = (float)stream.ReceiveNext();
+        }
     }
 }

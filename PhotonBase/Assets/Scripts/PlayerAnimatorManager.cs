@@ -1,8 +1,9 @@
+using Photon.Pun;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class PlayerAnimatorManager : MonoBehaviour
+public class PlayerAnimatorManager : MonoBehaviourPunCallbacks
 {
     private Animator animator;
 
@@ -23,6 +24,11 @@ public class PlayerAnimatorManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (photonView.IsMine == false && PhotonNetwork.IsConnected == true)
+        {
+            return;
+        }
+
         if (!animator)
         {
             return;
